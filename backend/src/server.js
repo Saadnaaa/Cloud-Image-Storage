@@ -75,13 +75,16 @@ console.log("Frontend dist path:", distPath);
 // Serve React static files
 app.use(express.static(distPath));
 
-// React SPA fallback
-app.get("*", (req, res) => {
-  // Don't handle unknown API routes with React
+// React SPA fallback for non-API GET requests.
+// Avoid a wildcard route string like "*" because Express 5 rejects it
+// with the path-to-regexp error seen on Render.
+app.use((req, res, next) => {
   if (req.path.startsWith("/api")) {
-    return res.status(404).json({
-      message: "API endpoint not found",
-    });
+    return next();
+  }
+
+  if (req.method !== "GET") {
+    return next();
   }
 
   res.sendFile(path.join(distPath, "index.html"));
