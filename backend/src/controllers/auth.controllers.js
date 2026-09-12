@@ -37,6 +37,8 @@ export const register = async (req, res) => {
 
     await newUser.save();
 
+    generateToken(newUser._id, res);
+
     res.status(201).json({
       message: "User created successfully",
       user: {
@@ -86,7 +88,11 @@ export const login = async (req, res) => {
 };
 
 export const logout = async (req, res) => {
-  res.clearCookie("jwt");
+  res.clearCookie("jwt", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
   res.status(200).json({ message: "Logout Successfull" });
   try {
   } catch (error) {

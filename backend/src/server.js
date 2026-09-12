@@ -2,32 +2,56 @@ import express from "express";
 import "dotenv/config";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import path from "path";
+import { fileURLToPath } from "url";
 import { connectDB } from "./config/db.js";
 import { authRouter } from "./routes/auth.routes.js";
 import { memoryRouter } from "./routes/memory.routes.js";
 
-const app = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
+const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(
-  cors({
-    origin: process.env.CLIENT_URL,
-    credentials: true,
-  }),
-);
+// CORS configuration (needed for local development on port 5173)
+if (process.env.NODE_ENV !== "production") {
+  app.use(
+    cors({
+      origin: process.env.CLIENT_URL || "http://localhost:5173",
+      credentials: true,
+    }),
+  );
+}
 
-app.use(express.json());
+// Request parsers with 10mb limit for base64 image uploads
 app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
+// API Routes
 app.use("/api/auth", authRouter);
 app.use("/api/memories", memoryRouter);
 
 app.get("/api", (req, res) => {
   res.status(200).json({ message: "Memory Cloud API is running" });
 });
+
+// Serve frontend in production
+if (process.env.NODE_ENV === "production") {
+  const distPath = path.resolve(__dirname, "../../frontend/dist");
+
+  // Serve static assets from frontend build
+  app.use(express.static(distPath));
+
+  // Catch-all route to serve index.html for React Router
+  app.use((req, res) => {
+    if (req.path.startsWith("/api")) {
+      return res.status(404).json({ message: "API endpoint not found" });
+    }
+    res.sendFile(path.resolve(distPath, "index.html"));
+  });
+}
 
 connectDB().then(() => {
   app.listen(PORT, () => {
