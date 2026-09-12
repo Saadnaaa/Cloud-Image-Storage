@@ -3,6 +3,7 @@ import "dotenv/config";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 import { connectDB } from "./config/db.js";
 import { authRouter } from "./routes/auth.routes.js";
@@ -46,18 +47,18 @@ app.get("/api", (req, res) => {
   res.status(200).json({ message: "Memory Cloud API is running" });
 });
 
-// Serve frontend in production
-if (process.env.NODE_ENV === "production") {
-  const distPath = path.resolve(__dirname, "../../frontend/dist");
+// Serve frontend in production or whenever the built frontend exists.
+const distPath = path.resolve(__dirname, "../../frontend/dist");
+const frontendBuildExists = fs.existsSync(distPath);
 
-  // Serve static assets from frontend build
+if (process.env.NODE_ENV === "production" || frontendBuildExists) {
   app.use(express.static(distPath));
 
-  // Catch-all route to serve index.html for React Router
-  app.use((req, res) => {
+  app.get(/^\/(?!api).*/, (req, res) => {
     if (req.path.startsWith("/api")) {
       return res.status(404).json({ message: "API endpoint not found" });
     }
+
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }
