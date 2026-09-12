@@ -4,6 +4,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import path from "path";
 import fs from "fs";
+import { execSync } from "child_process";
 import { fileURLToPath } from "url";
 import { connectDB } from "./config/db.js";
 import { authRouter } from "./routes/auth.routes.js";
@@ -49,10 +50,31 @@ app.get("/api", (req, res) => {
 
 // Serve frontend in production or whenever the built frontend exists.
 const distPath = path.resolve(__dirname, "../../frontend/dist");
-const frontendBuildExists = fs.existsSync(distPath);
+const ensureFrontendBuild = () => {
+  if (fs.existsSync(distPath)) {
+    return distPath;
+  }
 
-if (process.env.NODE_ENV === "production" || frontendBuildExists) {
-  app.use(express.static(distPath, { index: false }));
+  const rootPath = path.resolve(__dirname, "../..");
+
+  try {
+    console.log("Frontend dist folder missing. Building frontend for production...");
+    execSync("npm install --prefix frontend && npm run build --prefix frontend", {
+      cwd: rootPath,
+      stdio: "inherit",
+    });
+  } catch (error) {
+    console.error("Failed to build frontend bundle:", error.message);
+    return null;
+  }
+
+  return fs.existsSync(distPath) ? distPath : null;
+};
+
+const frontendDistPath = ensureFrontendBuild();
+
+if (process.env.NODE_ENV === "production" || frontendDistPath) {
+  app.use(express.static(frontendDistPath || distPath, { index: false }));
 
   app.get(/^(?!\/api).*/, (req, res, next) => {
     if (req.path.startsWith("/api")) {
@@ -63,7 +85,7 @@ if (process.env.NODE_ENV === "production" || frontendBuildExists) {
       return next();
     }
 
-    res.sendFile(path.resolve(distPath, "index.html"));
+    res.sendFile(path.resolve((frontendDistPath || distPath), "index.html"));
   });
 }
 
