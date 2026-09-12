@@ -54,7 +54,7 @@ const frontendBuildExists = fs.existsSync(distPath);
 if (process.env.NODE_ENV === "production" || frontendBuildExists) {
   app.use(express.static(distPath, { index: false }));
 
-  app.get("*", (req, res, next) => {
+  app.get(/^(?!\/api).*/, (req, res, next) => {
     if (req.path.startsWith("/api")) {
       return res.status(404).json({ message: "API endpoint not found" });
     }
