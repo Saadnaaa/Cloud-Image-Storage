@@ -2,8 +2,12 @@
   "name": "cloud-memory",
   "version": "1.0.0",
   "private": true,
+  "description": "Cloud Memory - MERN image memory app",
   "scripts": {
-    "build": "npm install --prefix backend && npm install --prefix frontend && npm run build --prefix frontend",
-    "start": "npm start --prefix backend"
+    "build": "npm ci --prefix frontend && npm run build --prefix frontend && npm ci --prefix backend --omit=dev",
+    "start": "node backend/src/server.js"
+  },
+  "engines": {
+    "node": ">=20.19.0"
   }
 }

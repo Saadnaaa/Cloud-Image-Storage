@@ -1,106 +1,96 @@
+import dns from "dns";
 import express from "express";
+import cookieParser from "cookie-parser";
 import "dotenv/config";
 import cors from "cors";
-import cookieParser from "cookie-parser";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
-import { connectDB } from "./config/db.js";
 import { authRouter } from "./routes/auth.routes.js";
 import { memoryRouter } from "./routes/memory.routes.js";
+import { connectDB } from "./config/db.js";
+
+dns.setServers(["1.1.1.1", "8.8.8.8"]);
+
+const PORT = process.env.PORT || 5000;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 
-const PORT = process.env.PORT || 5000;
+// ===============================
+// Middleware
+// ===============================
 
-// Allowed frontend origins
-const allowedOrigins = [
-  process.env.CLIENT_URL,
-  process.env.FRONTEND_URL,
-  "http://localhost:5173",
-  "http://127.0.0.1:5173",
-].filter(Boolean);
-
-// CORS
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allow requests without an origin
-      // and requests from allowed origins
-      if (!origin || allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      return callback(new Error("Not allowed by CORS"));
-    },
-    credentials: true,
-  }),
-);
-
-// Request parsers
 app.use(express.json({ limit: "10mb" }));
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // ===============================
-// API ROUTES
+// CORS
+// ===============================
+
+if (process.env.NODE_ENV !== "production") {
+  app.use(
+    cors({
+      origin: "http://localhost:5173",
+      credentials: true,
+    }),
+  );
+}
+
+// ===============================
+// API Routes
 // ===============================
 
 app.use("/api/auth", authRouter);
-
 app.use("/api/memories", memoryRouter);
 
-app.get("/api", (req, res) => {
+// ===============================
+// Health Check
+// ===============================
+
+app.get("/health", (req, res) => {
   res.status(200).json({
-    message: "Memory Cloud API is running",
+    success: true,
+    message: "Cloud Memory server is up and running",
   });
 });
 
 // ===============================
-// SERVE REACT FRONTEND
+// Serve React Frontend
 // ===============================
 
-// frontend/dist location
-// server.js is inside: backend/src/server.js
-// So ../../frontend/dist points to:
-// cloud-memory/frontend/dist
+const frontendDist = path.join(__dirname, "../../frontend/dist");
 
-const distPath = path.resolve(__dirname, "../../frontend/dist");
+if (fs.existsSync(frontendDist)) {
+  console.log("Frontend found:", frontendDist);
 
-console.log("Frontend dist path:", distPath);
+  // Serve React static files
+  app.use(express.static(frontendDist));
 
-// Serve React static files
-app.use(express.static(distPath));
-
-// React SPA fallback for non-API GET requests.
-// Avoid a wildcard route string like "*" because Express 5 rejects it
-// with the path-to-regexp error seen on Render.
-app.use((req, res, next) => {
-  if (req.path.startsWith("/api")) {
-    return next();
-  }
-
-  if (req.method !== "GET") {
-    return next();
-  }
-
-  res.sendFile(path.join(distPath, "index.html"));
-});
+  // React Router fallback
+  // API routes are excluded
+  app.get(/^(?!\/api).*/, (req, res) => {
+    res.sendFile(path.join(frontendDist, "index.html"));
+  });
+} else {
+  console.log("Frontend dist folder not found:", frontendDist);
+}
 
 // ===============================
-// START SERVER
+// Database + Server
 // ===============================
 
 connectDB()
   .then(() => {
     app.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}`);
+      console.log(`Server is up and running 🎉 on port ${PORT}`);
     });
   })
   .catch((error) => {
-    console.error("Failed to connect to database:", error);
+    console.error("Database connection failed:", error);
     process.exit(1);
   });
