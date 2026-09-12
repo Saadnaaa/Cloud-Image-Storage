@@ -7,6 +7,11 @@ import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import { MemoryProvider } from "./context/MemoryContext.jsx";
 
+const savedTheme = localStorage.getItem("theme");
+const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+const theme = savedTheme || (prefersDark ? "dark" : "light");
+document.documentElement.setAttribute("data-theme", theme);
+
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <BrowserRouter>
